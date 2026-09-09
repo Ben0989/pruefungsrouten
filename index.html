@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Prüfungsrouten Hattingen</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root{--bg:#0b1220;--panel:#111827;--muted:#94a3b8;--text:#f8fafc;--accent:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;--line:#263244}
+*{box-sizing:border-box} body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{padding:14px 16px;background:#0f172a;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}h1{font-size:18px;margin:0}header small{color:var(--muted)}
+main{display:grid;grid-template-columns:390px 1fr;height:calc(100vh - 67px)} aside{overflow:auto;padding:14px;background:var(--panel);border-right:1px solid var(--line)} #map{height:100%;min-height:520px}
+.card{background:#0f172a;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}.card h2{font-size:15px;margin:0 0 10px}label{display:block;margin:8px 0 4px;color:#cbd5e1}select,input,button{width:100%;padding:10px;border-radius:9px;border:1px solid #334155;background:#111827;color:var(--text)}button{cursor:pointer;font-weight:700}button.primary{background:#0369a1;border-color:#0284c7}button.good{background:#166534;border-color:#22c55e}button.ghost{background:#111827}button.warn{background:#78350f;border-color:#f59e0b}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.muted{color:var(--muted);font-size:13px}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#1e293b;margin:2px;font-size:12px}.pill.warn{background:#713f12}.pill.ok{background:#14532d}.route-list{padding-left:20px}.route-list li{margin:7px 0}.task{font-size:12px;color:#bfdbfe}.status{padding:8px;border-radius:8px;margin-top:8px;background:#172033;color:#cbd5e1}.legend{font-size:12px;display:flex;flex-wrap:wrap;gap:6px}.legend span{padding:4px 7px;border-radius:7px;background:#1e293b}.point-row{border-top:1px solid #263244;padding:8px 0}.point-row:first-child{border:0}.point-row b{display:block}.coords{font-family:ui-monospace,monospace;color:#93c5fd;font-size:11px}details summary{cursor:pointer;font-weight:700}.tiny{font-size:11px;color:#94a3b8}
+@media(max-width:820px){main{display:block;height:auto}aside{border-right:0}#map{height:62vh;position:sticky;bottom:0}.card{margin-bottom:10px}}
+</style>
+</head>
+<body>
+<header><h1>Prüfungsrouten Hattingen</h1><small>Fahrlehrer-Tool · Kartenrouting über OpenStreetMap/OSRM · Daten bleiben lokal im Browser</small></header>
+<main>
+<aside>
+  <section class="card">
+    <h2>Route erzeugen</h2>
+    <label>Start / Ende</label><select id="startSelect"></select>
+    <div class="row"><div><label>Zielzeit</label><select id="duration"><option value="35">ca. 35 min</option><option value="45" selected>ca. 45 min</option><option value="55">ca. 55 min</option><option value="65">ca. 65 min</option></select></div><div><label>Anzahl Prüfstellen</label><select id="count"><option>4</option><option selected>6</option><option>8</option><option>10</option></select></div></div>
+    <label>Schwerpunkt</label><select id="focus"><option value="mixed">Gemischt</option><option value="residential">Wohngebiet / r.v.l. / VB</option><option value="priority">Vorfahrt / Stop / Einbahnstraße</option><option value="basic">Grundfahraufgaben</option><option value="long">Stadtteile / längere Verbindung</option></select>
+    <div style="height:8px"></div><button class="primary" id="generate">Neue Prüfungsroute</button>
+    <div style="height:8px"></div><button class="good" id="navigate">Route in Google Maps öffnen</button>
+    <div id="routeStatus" class="status">Noch keine Route erzeugt.</div>
+  </section>
+
+  <section class="card"><h2>Route</h2><ol id="routeList" class="route-list"></ol></section>
+
+  <section class="card">
+    <details open><summary>GPS-Punkte verwalten</summary>
+      <p class="muted">Gelbe Punkte sind interne/mehrdeutige Bezeichnungen. „Auf Karte setzen“ drücken und anschließend die echte Stelle antippen. Die Koordinate wird lokal gespeichert.</p>
+      <div id="points"></div>
+      <button class="ghost" id="exportBtn">GPS-Daten exportieren (JSON)</button><div style="height:6px"></div><button class="ghost" id="resetBtn">Eigene GPS-Korrekturen zurücksetzen</button>
+    </details>
+  </section>
+
+  <section class="card tiny">VB = verkehrsberuhigter Bereich. Die App übernimmt die Begriffe aus deiner Prüfungsliste. Routing und Verkehrsführung stammen live aus OpenStreetMap/OSRM; bitte vor Ausbildung/Prüfung die tatsächliche Beschilderung vor Ort beachten.</section>
+</aside>
+<div id="map"></div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const DEFAULT_CENTER=[51.399,7.185];
+const rawPoints=[
+ {id:'tuev',name:'TÜV Hattingen',query:'An der Becke 17, 45527 Hattingen',lat:51.40155,lon:7.22065,cat:'start',task:'Prüfungsstart/-ende; Zufahrt oben/unten',verified:true},
+ {id:'holthausen',name:'Holthausen',query:'Holthausen, Hattingen',lat:51.3922,lon:7.2178,cat:'long',task:'von oben / von unten'},
+ {id:'hol_sack',name:'Holthausen Sackgasse',query:'Holthausen, Hattingen',lat:51.3914,lon:7.2155,cat:'basic',task:'Umkehren / Sackgasse',amb:true},
+ {id:'hol_vb',name:'Holthausen VB',query:'Holthausen, Hattingen',lat:51.3930,lon:7.2140,cat:'residential',task:'Verkehrsberuhigter Bereich',amb:true},
+ {id:'welper',name:'Welper',query:'Welper, Hattingen',lat:51.4121,lon:7.2064,cat:'long',task:'Stadt ↔ Fahrschule / Schule'},
+ {id:'wel_sack',name:'Welper Sackgasse',query:'Welper, Hattingen',lat:51.4140,lon:7.2070,cat:'basic',task:'Umkehren / Sackgasse',amb:true},
+ {id:'wel_hoch',name:'Welper Hochhaus',query:'Welper, Hattingen',lat:51.4115,lon:7.2072,cat:'residential',task:'kleine / große Runde',amb:true},
+ {id:'hellweg',name:'Hellweg',query:'Hellweg, Hattingen',lat:51.3992,lon:7.2107,cat:'priority',task:'bergauf / bergab',amb:true},
+ {id:'blank',name:'Blankenstein',query:'Blankenstein, Hattingen',lat:51.4062,lon:7.2295,cat:'long',task:'Ortsdurchfahrt'},
+ {id:'blank_kh',name:'Blankenstein KH Sackgasse',query:'Krankenhaus Blankenstein Hattingen',lat:51.4058,lon:7.2257,cat:'basic',task:'Sackgasse / Umkehren',amb:true},
+ {id:'blank_vb',name:'Blankenstein VB',query:'Blankenstein, Hattingen',lat:51.4050,lon:7.2305,cat:'residential',task:'Verkehrsberuhigter Bereich',amb:true},
+ {id:'sprock',name:'Sprockhövel',query:'Sprockhövel',lat:51.3682,lon:7.2485,cat:'long',task:'Prüfgebiet / Verbindung'},
+ {id:'quer',name:'Querspange Richtung Haßlinghausen',query:'Hattingen Richtung Hasslinghausen',lat:51.3790,lon:7.2310,cat:'long',task:'Richtung Haßlinghausen',amb:true},
+ {id:'oster',name:'Osterhöfgen',query:'Osterhöfgen, Hattingen',lat:51.3885,lon:7.2010,cat:'priority',task:'Stoppschild / Prüfpunkt',amb:true},
+ {id:'glueck',name:'Glückaufhalle',query:'Glückaufhalle Hattingen',lat:51.3940,lon:7.1900,cat:'basic',task:'Grundfahraufgaben',amb:true},
+ {id:'sport',name:'Sportplatz',query:'Sportplatz Hattingen',lat:51.3932,lon:7.1940,cat:'basic',task:'Grundfahraufgaben / Umkehren',amb:true},
+ {id:'sued',name:'Südstadt',query:'Südstadt Hattingen',lat:51.3890,lon:7.1810,cat:'residential',task:'Wohngebiet'},
+ {id:'altefw',name:'Alte Feuerwehr links',query:'Feuerwehr Hattingen',lat:51.3990,lon:7.1820,cat:'priority',task:'links',amb:true},
+ {id:'bus_vb',name:'Busbahnhof VB',query:'Busbahnhof Hattingen Mitte',lat:51.4002,lon:7.1814,cat:'residential',task:'VB / Innenstadt',amb:true},
+ {id:'neuefw',name:'Neue Feuerwehr',query:'Feuerwehr Hattingen',lat:51.3943,lon:7.1762,cat:'long',task:'Prüfpunkt',amb:true},
+ {id:'gruen',name:'Grünstraße',query:'Grünstraße, Hattingen',lat:51.3980,lon:7.1830,cat:'priority',task:'Straßenbeobachtung',amb:true},
+ {id:'nord',name:'Nordstraße',query:'Nordstraße, Hattingen',lat:51.4030,lon:7.1840,cat:'priority',task:'KH Richtung Harzer / andersrum',amb:true},
+ {id:'ober',name:'Oberwinzerfeld',query:'Oberwinzerfeld, Hattingen',lat:51.3865,lon:7.1740,cat:'residential',task:'Stop / Einbahnstraße / Wohngebiet'},
+ {id:'harzer',name:'Harzer',query:'Harzer Weg Hattingen',lat:51.3925,lon:7.1760,cat:'priority',task:'Richtung Avantgarde / andersrum',amb:true},
+ {id:'tal',name:'Talstraße',query:'Talstraße, Hattingen',lat:51.3970,lon:7.1910,cat:'priority',task:'von oben / von unten; Stop'},
+ {id:'bhf',name:'Bahnhofstraße',query:'Bahnhofstraße, Hattingen',lat:51.3979,lon:7.1770,cat:'priority',task:'Innenstadt / Einbahnstraße'},
+ {id:'mc',name:'Gegenüber McDonald’s links',query:'McDonalds Hattingen',lat:51.3970,lon:7.1870,cat:'priority',task:'Linksabbiegen',amb:true},
+ {id:'salz',name:'Salzweg',query:'Salzweg, Hattingen',lat:51.3920,lon:7.1665,cat:'residential',task:'Wohngebiet'},
+ {id:'besch_blank',name:'Beschleunigungsstreifen → Blankenstein',query:'Hattingen Blankenstein',lat:51.4045,lon:7.2115,cat:'long',task:'Beschleunigungsstreifen',amb:true},
+ {id:'besch_hat',name:'Beschleunigungsstreifen → Hattingen',query:'Hattingen',lat:51.4038,lon:7.2095,cat:'long',task:'Beschleunigungsstreifen',amb:true},
+ {id:'pol',name:'Polizei links',query:'Polizei Hattingen',lat:51.3985,lon:7.1818,cat:'priority',task:'Linksabbiegen',amb:true},
+ {id:'avant',name:'Avantgarde Hotel',query:'Welperstraße 49, 45525 Hattingen',lat:51.4050,lon:7.1955,cat:'priority',task:'Richtung Kreis / andersrum; Sackgasse; Ampel; Stop / Einbahnstraße',verified:true},
+ {id:'rvl',name:'Rechts vor links',query:'Hattingen',lat:51.3900,lon:7.1800,cat:'residential',task:'Rechts-vor-links Schwerpunkt',amb:true},
+ {id:'rvl_netto',name:'Rechts vor links Netto',query:'Netto Hattingen',lat:51.3970,lon:7.1940,cat:'residential',task:'Rechts vor links',amb:true},
+ {id:'dier',name:'Diergardt',query:'Diergardtstraße Hattingen',lat:51.4030,lon:7.2010,cat:'priority',task:'Stoppschild',amb:true},
+ {id:'stolle',name:'Stolle Stop',query:'Stolle Hattingen',lat:51.3950,lon:7.2040,cat:'priority',task:'Stoppschild',amb:true},
+ {id:'aldi',name:'Aldi Einbahnstraße',query:'Aldi Hattingen',lat:51.3990,lon:7.1775,cat:'priority',task:'Einbahnstraße',amb:true},
+ {id:'markt',name:'Marktplatz',query:'Marktplatz Hattingen',lat:51.3983,lon:7.1810,cat:'priority',task:'Einbahnstraße kleine / große Runde',amb:true},
+ {id:'tanz',name:'Tanzschule',query:'Tanzschule Hattingen',lat:51.3990,lon:7.1840,cat:'priority',task:'Einbahnstraße',amb:true},
+ {id:'hirsch',name:'Hirschberger',query:'Hirschberger Straße Hattingen',lat:51.3905,lon:7.1810,cat:'priority',task:'Einbahnstraße',amb:true},
+ {id:'park',name:'Parklücke',query:'Hattingen',lat:51.3950,lon:7.1850,cat:'basic',task:'Längs einparken',amb:true},
+ {id:'boxv',name:'Parkbox vorwärts',query:'Hattingen',lat:51.3960,lon:7.1860,cat:'basic',task:'Vorwärts einparken',amb:true},
+ {id:'boxr',name:'Parkbox rückwärts',query:'Hattingen',lat:51.3965,lon:7.1865,cat:'basic',task:'Rückwärts einparken',amb:true},
+ {id:'turn',name:'Umkehren',query:'Hattingen',lat:51.3940,lon:7.1830,cat:'basic',task:'Umkehren',amb:true},
+ {id:'brake',name:'Gefahrbremsung',query:'Hattingen',lat:51.3920,lon:7.1900,cat:'basic',task:'Gefahrbremsung',amb:true}
+];
+rawPoints.forEach(p=>{if(!p.verified)p.amb=true;});
+let points=JSON.parse(localStorage.getItem('hattingen_exam_points')||'null')||rawPoints;
+let map=L.map('map').setView(DEFAULT_CENTER,13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+let markers={},routeLine=null,currentRoute=[],settingId=null;
+function icon(p){return L.divIcon({className:'',html:`<div style="width:15px;height:15px;border-radius:50%;background:${p.amb?'#f59e0b':p.verified?'#22c55e':'#38bdf8'};border:2px solid white;box-shadow:0 1px 4px #0008"></div>`,iconSize:[15,15],iconAnchor:[7,7]});}
+function redrawMarkers(){Object.values(markers).forEach(m=>map.removeLayer(m));markers={};points.forEach(p=>{let m=L.marker([p.lat,p.lon],{icon:icon(p)}).addTo(map).bindPopup(`<b>${p.name}</b><br>${p.task}<br><small>${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}</small>`);markers[p.id]=m;});}
+function populate(){let s=document.getElementById('startSelect');s.innerHTML=points.map(p=>`<option value="${p.id}" ${p.id==='tuev'?'selected':''}>${p.name}</option>`).join('');document.getElementById('points').innerHTML=points.map(p=>`<div class="point-row"><b>${p.name} ${p.amb?'<span class="pill warn">prüfen</span>':'<span class="pill ok">gesetzt</span>'}</b><span class="coords">${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}</span><div class="tiny">${p.task}</div><button class="ghost" onclick="startSet('${p.id}')">Auf Karte setzen</button></div>`).join('');}
+window.startSet=id=>{settingId=id;document.getElementById('routeStatus').textContent='Karte antippen: GPS-Punkt für „'+points.find(p=>p.id===id).name+'“ setzen.';map.setView([points.find(p=>p.id===id).lat,points.find(p=>p.id===id).lon],16)};
+map.on('click',e=>{if(!settingId)return;let p=points.find(x=>x.id===settingId);p.lat=e.latlng.lat;p.lon=e.latlng.lng;p.amb=false;p.userSet=true;localStorage.setItem('hattingen_exam_points',JSON.stringify(points));settingId=null;populate();redrawMarkers();document.getElementById('routeStatus').textContent=`GPS gespeichert: ${p.name}`;});
+function distance(a,b){const R=6371,toRad=x=>x*Math.PI/180,dLat=toRad(b.lat-a.lat),dLon=toRad(b.lon-a.lon),aa=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(aa));}
+function weightedPick(arr,n,focus,start){let pool=arr.filter(p=>p.id!==start.id);pool=pool.map(p=>({...p,w:(focus==='mixed'?1:(p.cat===focus?4:0.7))*(p.amb?0.7:1)}));let out=[],cur=start;while(out.length<n&&pool.length){pool.sort((a,b)=>{let sa=Math.random()*a.w+Math.min(distance(cur,a),6)*.05,sb=Math.random()*b.w+Math.min(distance(cur,b),6)*.05;return sb-sa});let p=pool.shift();out.push(p);cur=p;}return out;}
+async function routeOSRM(seq){const coords=seq.map(p=>`${p.lon},${p.lat}`).join(';');let url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`;
+ let r=await fetch(url);if(!r.ok)throw new Error('Routing nicht erreichbar');let j=await r.json();if(!j.routes?.length)throw new Error('Keine Route gefunden');return j.routes[0];}
+async function generate(){let start=points.find(p=>p.id===document.getElementById('startSelect').value),n=+document.getElementById('count').value,focus=document.getElementById('focus').value,target=+document.getElementById('duration').value;document.getElementById('routeStatus').textContent='Route wird berechnet …';
+ let best=null;for(let tries=0;tries<5;tries++){let chosen=weightedPick(points,n,focus,start),seq=[start,...chosen,start];try{let r=await routeOSRM(seq);let mins=r.duration/60,score=Math.abs(mins-target);if(!best||score<best.score)best={seq,r,score};}catch(e){}}
+ if(!best){document.getElementById('routeStatus').textContent='Routingdienst aktuell nicht erreichbar. Punkte wurden nicht verändert.';return;}currentRoute=best.seq;if(routeLine)map.removeLayer(routeLine);routeLine=L.geoJSON(best.r.geometry,{style:{weight:6,opacity:.8}}).addTo(map);map.fitBounds(routeLine.getBounds(),{padding:[25,25]});document.getElementById('routeList').innerHTML=currentRoute.map((p,i)=>`<li><b>${i===0?'Start':i===currentRoute.length-1?'Ende':p.name}</b>${i>0&&i<currentRoute.length-1?`<div class="task">${p.task}</div>`:''}</li>`).join('');document.getElementById('routeStatus').innerHTML=`<b>${(best.r.distance/1000).toFixed(1)} km</b> · ca. <b>${Math.round(best.r.duration/60)} min</b> reine Fahrzeit<br><span class="muted">Mit Aufgaben/Anhalten real etwas länger.</span>`;}
+function navigate(){if(!currentRoute.length)return alert('Bitte zuerst eine Route erzeugen.');let pts=currentRoute;let origin=`${pts[0].lat},${pts[0].lon}`,dest=`${pts[pts.length-1].lat},${pts[pts.length-1].lon}`,wps=pts.slice(1,-1).map(p=>`${p.lat},${p.lon}`).join('|');let u=`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&travelmode=driving&waypoints=${encodeURIComponent(wps)}`;window.open(u,'_blank');}
+document.getElementById('generate').onclick=generate;document.getElementById('navigate').onclick=navigate;document.getElementById('exportBtn').onclick=()=>{let blob=new Blob([JSON.stringify(points,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pruefungsrouten_hattingen_gps.json';a.click();URL.revokeObjectURL(a.href)};document.getElementById('resetBtn').onclick=()=>{if(confirm('Eigene GPS-Korrekturen wirklich löschen?')){localStorage.removeItem('hattingen_exam_points');points=JSON.parse(JSON.stringify(rawPoints));populate();redrawMarkers();}};
+populate();redrawMarkers();
+</script>
+</body>
+</html>
