@@ -1,233 +1,26 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Prüfungsrouten Hattingen</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-:root{--bg:#0b1220;--panel:#111827;--muted:#94a3b8;--text:#f8fafc;--accent:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;--line:#263244}
-*{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-header{padding:12px 16px;background:#0f172a;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}h1{font-size:18px;margin:0}.sub{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:12px}.sync{display:inline-block;padding:2px 7px;border-radius:999px;background:#334155}.sync.ok{background:#14532d;color:#dcfce7}.sync.warn{background:#713f12;color:#fef3c7}
-main{display:grid;grid-template-columns:390px 1fr;height:calc(100vh - 67px)}aside{overflow:auto;padding:14px;background:var(--panel);border-right:1px solid var(--line)}#map{height:100%;min-height:520px}
-.card{background:#0f172a;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}.card h2{font-size:15px;margin:0 0 10px}label{display:block;margin:8px 0 4px;color:#cbd5e1}
-select,input,button{width:100%;padding:10px;border-radius:9px;border:1px solid #334155;background:#111827;color:var(--text)}button{cursor:pointer;font-weight:700}button.primary{background:#0369a1;border-color:#0284c7}button.good{background:#166534;border-color:#22c55e}button.ghost{background:#111827}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.muted{color:var(--muted);font-size:13px}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#1e293b;margin:2px;font-size:12px}.pill.warn{background:#713f12}.pill.ok{background:#14532d}
-.route-list{padding-left:20px}.route-list li{margin:7px 0}.task{font-size:12px;color:#bfdbfe}.status{padding:8px;border-radius:8px;margin-top:8px;background:#172033;color:#cbd5e1}.point-row{border-top:1px solid #263244;padding:8px 0}.point-row:first-child{border:0}.point-row b{display:block}.coords{font-family:ui-monospace,monospace;color:#93c5fd;font-size:11px}details summary{cursor:pointer;font-weight:700}.tiny{font-size:11px;color:#94a3b8}
-@media(max-width:820px){main{display:block;height:auto}aside{border-right:0}#map{height:62vh;position:sticky;bottom:0}.card{margin-bottom:10px}}
-</style>
-</head>
-<body>
-<header>
-  <h1>Prüfungsrouten Hattingen</h1>
-  <div class="sub">Fahrlehrer-Tool · OpenStreetMap/OSRM · <span id="syncBadge" class="sync">verbinde …</span></div>
-</header>
-<main>
-<aside>
-<section class="card">
-  <h2>Route erzeugen</h2>
-  <label>Start / Ende</label><select id="startSelect"></select>
-  <div class="row">
-    <div><label>Zielzeit</label><select id="duration"><option value="35">ca. 35 min</option><option value="45" selected>ca. 45 min</option><option value="55">ca. 55 min</option><option value="65">ca. 65 min</option></select></div>
-    <div><label>Anzahl Prüfstellen</label><select id="count"><option>4</option><option selected>6</option><option>8</option><option>10</option></select></div>
-  </div>
-  <label>Schwerpunkt</label><select id="focus"><option value="mixed">Gemischt</option><option value="residential">Wohngebiet / r.v.l. / VB</option><option value="priority">Vorfahrt / Stop / Einbahnstraße</option><option value="basic">Grundfahraufgaben</option><option value="long">Stadtteile / längere Verbindung</option></select>
-  <div style="height:8px"></div><button class="primary" id="generate">Neue Prüfungsroute</button>
-  <div style="height:8px"></div><button class="good" id="navigate">Route in Google Maps öffnen</button>
-  <div id="routeStatus" class="status">Daten werden geladen …</div>
-</section>
-
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Prüfungsrouten Hattingen</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
+:root{--bg:#0b1220;--panel:#111827;--muted:#94a3b8;--text:#f8fafc;--line:#263244}*{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui;background:var(--bg);color:var(--text)}header{padding:12px 16px;background:#0f172a;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}h1{font-size:18px;margin:0}.sub{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:12px}.sync{padding:2px 7px;border-radius:999px;background:#334155}.sync.ok{background:#14532d}.sync.warn{background:#713f12}main{display:grid;grid-template-columns:390px 1fr;height:calc(100vh - 67px)}aside{overflow:auto;padding:14px;background:var(--panel);border-right:1px solid var(--line)}#mapWrap{position:relative;height:100%;min-height:520px}#map{height:100%;min-height:520px}.map-toggle{position:absolute;z-index:1200;top:10px;right:10px;width:auto;padding:9px 12px;background:#0f172a;border:1px solid #475569;box-shadow:0 2px 8px #0008}.map-toggle.menu{background:#166534;border-color:#22c55e}.card{background:#0f172a;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}.card h2{font-size:15px;margin:0 0 10px}label{display:block;margin:8px 0 4px;color:#cbd5e1}select,input,button{width:100%;padding:10px;border-radius:9px;border:1px solid #334155;background:#111827;color:var(--text)}button{cursor:pointer;font-weight:700}.primary{background:#0369a1}.good{background:#166534}.ghost{background:#111827}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.muted,.tiny{color:var(--muted);font-size:13px}.tiny{font-size:11px}.pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px}.warn{background:#713f12}.ok{background:#14532d}.status{padding:8px;border-radius:8px;margin-top:8px;background:#172033}.point-row{border-top:1px solid var(--line);padding:8px 0}.coords{font-family:monospace;color:#93c5fd;font-size:11px}.route-list{padding-left:20px}.task{font-size:12px;color:#bfdbfe}@media(max-width:820px){main{display:block;height:auto}aside{border:0}#mapWrap{height:55vh;min-height:360px;position:sticky;bottom:0}#map{height:100%;min-height:360px}body.map-full{overflow:hidden}body.map-full #mapWrap{position:fixed;inset:0;height:100dvh;z-index:2000;min-height:0}body.map-full #map{min-height:0}body.map-full .map-toggle{top:max(12px,env(safe-area-inset-top));right:12px}}
+</style></head><body><header><h1>Prüfungsrouten Hattingen</h1><div class="sub">Fahrlehrer-Tool · OpenStreetMap/OSRM · <span id="syncBadge" class="sync">verbinde …</span></div></header><main><aside>
+<section class="card"><h2>Route erzeugen</h2><label>Start / Ende</label><select id="startSelect"></select><div class="row"><div><label>Zielzeit</label><select id="duration"><option>35</option><option selected>45</option><option>55</option><option>65</option></select></div><div><label>Prüfstellen</label><select id="count"><option>4</option><option selected>6</option><option>8</option><option>10</option></select></div></div><label>Schwerpunkt</label><select id="focus"><option value="mixed">Gemischt</option><option value="residential">Wohngebiet / r.v.l. / VB</option><option value="priority">Vorfahrt / Stop / Einbahnstraße</option><option value="basic">Grundfahraufgaben</option><option value="long">Längere Verbindung</option></select><div style="height:8px"></div><button class="primary" id="generate">Neue Prüfungsroute</button><div style="height:8px"></div><button class="good" id="navigate">Route in Google Maps öffnen</button><div id="routeStatus" class="status">Daten werden geladen …</div></section>
 <section class="card"><h2>Route</h2><ol id="routeList" class="route-list"></ol></section>
-
-<section class="card">
-<details open><summary>GPS-Punkte verwalten</summary>
-<p class="muted">Gelbe Punkte sind noch nicht verifiziert. „Auf Karte setzen“ drücken und danach die tatsächliche Stelle auf der Karte antippen. Bei aktiver Supabase-Verbindung wird die Änderung zentral für alle Geräte gespeichert.</p>
-<div id="points"></div>
-<button class="ghost" id="reloadBtn">Aus Supabase neu laden</button>
-<div style="height:6px"></div><button class="ghost" id="exportBtn">GPS-Daten exportieren (JSON)</button>
-</details>
-</section>
-
-<section class="card tiny">VB = verkehrsberuhigter Bereich. Routing und Verkehrsführung stammen live aus OpenStreetMap/OSRM. Beschilderung und tatsächliche Verkehrslage vor Ort haben Vorrang.</section>
-</aside>
-<div id="map"></div>
-</main>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-const SUPABASE_URL='https://jkeecmedgsqymiskwtcl.supabase.co';
-const SUPABASE_KEY='sb_publishable_IIvi7wMB2GWkKWt1KLLHKA_6TLz9pi8';
-const DEFAULT_CENTER=[51.399,7.185];
-const rawPoints=[
-{id:'tuev',name:'TÜV Hattingen',query:'An der Becke 17, 45527 Hattingen',lat:51.40155,lon:7.22065,cat:'start',task:'Prüfungsstart/-ende; Zufahrt oben/unten',verified:true,amb:false},
-{id:'holthausen',name:'Holthausen',query:'Holthausen, Hattingen',lat:51.3922,lon:7.2178,cat:'long',task:'von oben / von unten',verified:false,amb:true},
-{id:'hol_sack',name:'Holthausen Sackgasse',query:'Holthausen, Hattingen',lat:51.3914,lon:7.2155,cat:'basic',task:'Umkehren / Sackgasse',verified:false,amb:true},
-{id:'hol_vb',name:'Holthausen VB',query:'Holthausen, Hattingen',lat:51.3930,lon:7.2140,cat:'residential',task:'Verkehrsberuhigter Bereich',verified:false,amb:true},
-{id:'welper',name:'Welper',query:'Welper, Hattingen',lat:51.4121,lon:7.2064,cat:'long',task:'Stadt ↔ Fahrschule / Schule',verified:false,amb:true},
-{id:'wel_sack',name:'Welper Sackgasse',query:'Welper, Hattingen',lat:51.4140,lon:7.2070,cat:'basic',task:'Umkehren / Sackgasse',verified:false,amb:true},
-{id:'wel_hoch',name:'Welper Hochhaus',query:'Welper, Hattingen',lat:51.4115,lon:7.2072,cat:'residential',task:'kleine / große Runde',verified:false,amb:true},
-{id:'hellweg',name:'Hellweg',query:'Hellweg, Hattingen',lat:51.3992,lon:7.2107,cat:'priority',task:'bergauf / bergab',verified:false,amb:true},
-{id:'blank',name:'Blankenstein',query:'Blankenstein, Hattingen',lat:51.4062,lon:7.2295,cat:'long',task:'Ortsdurchfahrt',verified:false,amb:true},
-{id:'blank_kh',name:'Blankenstein KH Sackgasse',query:'Krankenhaus Blankenstein Hattingen',lat:51.4058,lon:7.2257,cat:'basic',task:'Sackgasse / Umkehren',verified:false,amb:true},
-{id:'blank_vb',name:'Blankenstein VB',query:'Blankenstein, Hattingen',lat:51.4050,lon:7.2305,cat:'residential',task:'Verkehrsberuhigter Bereich',verified:false,amb:true},
-{id:'sprock',name:'Sprockhövel',query:'Sprockhövel',lat:51.3682,lon:7.2485,cat:'long',task:'Prüfgebiet / Verbindung',verified:false,amb:true},
-{id:'quer',name:'Querspange Richtung Haßlinghausen',query:'Hattingen Richtung Hasslinghausen',lat:51.3790,lon:7.2310,cat:'long',task:'Richtung Haßlinghausen',verified:false,amb:true},
-{id:'oster',name:'Osterhöfgen',query:'Osterhöfgen, Hattingen',lat:51.3885,lon:7.2010,cat:'priority',task:'Stoppschild / Prüfpunkt',verified:false,amb:true},
-{id:'glueck',name:'Glückaufhalle',query:'Glückaufhalle Hattingen',lat:51.3940,lon:7.1900,cat:'basic',task:'Grundfahraufgaben',verified:false,amb:true},
-{id:'sport',name:'Sportplatz',query:'Sportplatz Hattingen',lat:51.3932,lon:7.1940,cat:'basic',task:'Grundfahraufgaben / Umkehren',verified:false,amb:true},
-{id:'sued',name:'Südstadt',query:'Südstadt Hattingen',lat:51.3890,lon:7.1810,cat:'residential',task:'Wohngebiet',verified:false,amb:true},
-{id:'altefw',name:'Alte Feuerwehr links',query:'Feuerwehr Hattingen',lat:51.3990,lon:7.1820,cat:'priority',task:'links',verified:false,amb:true},
-{id:'bus_vb',name:'Busbahnhof VB',query:'Busbahnhof Hattingen Mitte',lat:51.4002,lon:7.1814,cat:'residential',task:'VB / Innenstadt',verified:false,amb:true},
-{id:'neuefw',name:'Neue Feuerwehr',query:'Feuerwehr Hattingen',lat:51.3943,lon:7.1762,cat:'long',task:'Prüfpunkt',verified:false,amb:true},
-{id:'gruen',name:'Grünstraße',query:'Grünstraße, Hattingen',lat:51.3980,lon:7.1830,cat:'priority',task:'Straßenbeobachtung',verified:false,amb:true},
-{id:'nord',name:'Nordstraße',query:'Nordstraße, Hattingen',lat:51.4030,lon:7.1840,cat:'priority',task:'KH Richtung Harzer / andersrum',verified:false,amb:true},
-{id:'ober',name:'Oberwinzerfeld',query:'Oberwinzerfeld, Hattingen',lat:51.3865,lon:7.1740,cat:'residential',task:'Stop / Einbahnstraße / Wohngebiet',verified:false,amb:true},
-{id:'harzer',name:'Harzer',query:'Harzer Weg Hattingen',lat:51.3925,lon:7.1760,cat:'priority',task:'Richtung Avantgarde / andersrum',verified:false,amb:true},
-{id:'tal',name:'Talstraße',query:'Talstraße, Hattingen',lat:51.3970,lon:7.1910,cat:'priority',task:'von oben / von unten; Stop',verified:false,amb:true},
-{id:'bhf',name:'Bahnhofstraße',query:'Bahnhofstraße, Hattingen',lat:51.3979,lon:7.1770,cat:'priority',task:'Innenstadt / Einbahnstraße',verified:false,amb:true},
-{id:'mc',name:'Gegenüber McDonald’s links',query:'McDonalds Hattingen',lat:51.3970,lon:7.1870,cat:'priority',task:'Linksabbiegen',verified:false,amb:true},
-{id:'salz',name:'Salzweg',query:'Salzweg, Hattingen',lat:51.3920,lon:7.1665,cat:'residential',task:'Wohngebiet',verified:false,amb:true},
-{id:'besch_blank',name:'Beschleunigungsstreifen → Blankenstein',query:'Hattingen Blankenstein',lat:51.4045,lon:7.2115,cat:'long',task:'Beschleunigungsstreifen',verified:false,amb:true},
-{id:'besch_hat',name:'Beschleunigungsstreifen → Hattingen',query:'Hattingen',lat:51.4038,lon:7.2095,cat:'long',task:'Beschleunigungsstreifen',verified:false,amb:true},
-{id:'pol',name:'Polizei links',query:'Polizei Hattingen',lat:51.3985,lon:7.1818,cat:'priority',task:'Linksabbiegen',verified:false,amb:true},
-{id:'avant',name:'Avantgarde Hotel',query:'Welperstraße 49, 45525 Hattingen',lat:51.4050,lon:7.1955,cat:'priority',task:'Richtung Kreis / andersrum; Sackgasse; Ampel; Stop / Einbahnstraße',verified:true,amb:false},
-{id:'rvl',name:'Rechts vor links',query:'Hattingen',lat:51.3900,lon:7.1800,cat:'residential',task:'Rechts-vor-links Schwerpunkt',verified:false,amb:true},
-{id:'rvl_netto',name:'Rechts vor links Netto',query:'Netto Hattingen',lat:51.3970,lon:7.1940,cat:'residential',task:'Rechts vor links',verified:false,amb:true},
-{id:'dier',name:'Diergardt',query:'Diergardtstraße Hattingen',lat:51.4030,lon:7.2010,cat:'priority',task:'Stoppschild',verified:false,amb:true},
-{id:'stolle',name:'Stolle Stop',query:'Stolle Hattingen',lat:51.3950,lon:7.2040,cat:'priority',task:'Stoppschild',verified:false,amb:true},
-{id:'aldi',name:'Aldi Einbahnstraße',query:'Aldi Hattingen',lat:51.3990,lon:7.1775,cat:'priority',task:'Einbahnstraße',verified:false,amb:true},
-{id:'markt',name:'Marktplatz',query:'Marktplatz Hattingen',lat:51.3983,lon:7.1810,cat:'priority',task:'Einbahnstraße kleine / große Runde',verified:false,amb:true},
-{id:'tanz',name:'Tanzschule',query:'Tanzschule Hattingen',lat:51.3990,lon:7.1840,cat:'priority',task:'Einbahnstraße',verified:false,amb:true},
-{id:'hirsch',name:'Hirschberger',query:'Hirschberger Straße Hattingen',lat:51.3905,lon:7.1810,cat:'priority',task:'Einbahnstraße',verified:false,amb:true},
-{id:'park',name:'Parklücke',query:'Hattingen',lat:51.3950,lon:7.1850,cat:'basic',task:'Längs einparken',verified:false,amb:true},
-{id:'boxv',name:'Parkbox vorwärts',query:'Hattingen',lat:51.3960,lon:7.1860,cat:'basic',task:'Vorwärts einparken',verified:false,amb:true},
-{id:'boxr',name:'Parkbox rückwärts',query:'Hattingen',lat:51.3965,lon:7.1865,cat:'basic',task:'Rückwärts einparken',verified:false,amb:true},
-{id:'turn',name:'Umkehren',query:'Hattingen',lat:51.3940,lon:7.1830,cat:'basic',task:'Umkehren',verified:false,amb:true},
-{id:'brake',name:'Gefahrbremsung',query:'Hattingen',lat:51.3920,lon:7.1900,cat:'basic',task:'Gefahrbremsung',verified:false,amb:true}
-];
-
-const apiHeaders={'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'};
-let points=JSON.parse(localStorage.getItem('hattingen_exam_points')||'null')||structuredClone(rawPoints);
-let cloudOnline=false, settingId=null, markers={}, routeLine=null, currentRoute=[];
-const map=L.map('map').setView(DEFAULT_CENTER,13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-
-function setSync(ok,text){
-  cloudOnline=ok;
-  const b=document.getElementById('syncBadge');
-  b.textContent=text;
-  b.className='sync '+(ok?'ok':'warn');
-}
-async function loadCloud(){
-  try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/exam_points?select=*&order=name.asc`,{headers:apiHeaders});
-    if(!r.ok) throw new Error(await r.text());
-    const data=await r.json();
-    if(data.length){
-      points=data.map(p=>({id:p.id,name:p.name,query:p.query||'',lat:+p.lat,lon:+p.lon,cat:p.cat||'mixed',task:p.task||'',verified:!!p.verified,amb:!!p.amb}));
-      localStorage.setItem('hattingen_exam_points',JSON.stringify(points));
-      setSync(true,'Supabase synchronisiert');
-      populate(); redrawMarkers();
-      document.getElementById('routeStatus').textContent=`${points.length} GPS-Punkte aus Supabase geladen.`;
-      return;
-    }
-    throw new Error('Tabelle leer');
-  }catch(e){
-    console.warn('Supabase fallback:',e);
-    setSync(false,'lokaler Fallback');
-    populate(); redrawMarkers();
-    document.getElementById('routeStatus').textContent='Supabase noch nicht eingerichtet/erreichbar. Lokale Daten werden verwendet.';
-  }
-}
-async function saveCloud(p){
-  localStorage.setItem('hattingen_exam_points',JSON.stringify(points));
-  try{
-    const body={id:p.id,name:p.name,query:p.query||'',lat:p.lat,lon:p.lon,cat:p.cat||'mixed',task:p.task||'',verified:!!p.verified,amb:!!p.amb};
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/exam_points?on_conflict=id`,{
-      method:'POST',
-      headers:{...apiHeaders,'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify(body)
-    });
-    if(!r.ok) throw new Error(await r.text());
-    setSync(true,'Supabase synchronisiert');
-    return true;
-  }catch(e){
-    console.warn(e);
-    setSync(false,'lokal gespeichert');
-    return false;
-  }
-}
-function icon(p){return L.divIcon({className:'',html:`<div style="width:15px;height:15px;border-radius:50%;background:${p.amb?'#f59e0b':p.verified?'#22c55e':'#38bdf8'};border:2px solid white;box-shadow:0 1px 4px #0008"></div>`,iconSize:[15,15],iconAnchor:[7,7]});}
-function redrawMarkers(){
-  Object.values(markers).forEach(m=>map.removeLayer(m)); markers={};
-  points.forEach(p=>{markers[p.id]=L.marker([p.lat,p.lon],{icon:icon(p)}).addTo(map).bindPopup(`<b>${p.name}</b><br>${p.task}<br><small>${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}</small>`);});
-}
-function populate(){
-  const s=document.getElementById('startSelect'),old=s.value;
-  s.innerHTML=points.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  s.value=points.some(p=>p.id===old)?old:(points.some(p=>p.id==='tuev')?'tuev':points[0]?.id||'');
-  document.getElementById('points').innerHTML=points.map(p=>`<div class="point-row"><b>${p.name} ${p.amb?'<span class="pill warn">prüfen</span>':'<span class="pill ok">gesetzt</span>'}</b><span class="coords">${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}</span><div class="tiny">${p.task}</div><button class="ghost" onclick="startSet('${p.id}')">Auf Karte setzen</button></div>`).join('');
-}
-window.startSet=id=>{
-  settingId=id;
-  const p=points.find(x=>x.id===id);
-  document.getElementById('routeStatus').textContent=`Karte antippen: GPS-Punkt für „${p.name}“ setzen.`;
-  map.setView([p.lat,p.lon],16);
-};
-map.on('click',async e=>{
-  if(!settingId)return;
-  const p=points.find(x=>x.id===settingId);
-  p.lat=e.latlng.lat; p.lon=e.latlng.lng; p.amb=false; p.verified=true;
-  settingId=null; populate(); redrawMarkers();
-  document.getElementById('routeStatus').textContent=`Speichere ${p.name} …`;
-  const ok=await saveCloud(p);
-  document.getElementById('routeStatus').textContent=ok?`GPS zentral gespeichert: ${p.name}`:`GPS lokal gespeichert: ${p.name}. Supabase war nicht erreichbar.`;
-});
-function distance(a,b){const R=6371,toRad=x=>x*Math.PI/180,dLat=toRad(b.lat-a.lat),dLon=toRad(b.lon-a.lon),aa=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(aa));}
-function weightedPick(arr,n,focus,start){
-  let pool=arr.filter(p=>p.id!==start.id).map(p=>({...p,w:(focus==='mixed'?1:(p.cat===focus?4:0.7))*(p.amb?0.7:1)})),out=[],cur=start;
-  while(out.length<n&&pool.length){
-    pool.sort((a,b)=>{const sa=Math.random()*a.w+Math.min(distance(cur,a),6)*.05,sb=Math.random()*b.w+Math.min(distance(cur,b),6)*.05;return sb-sa;});
-    const p=pool.shift(); out.push(p); cur=p;
-  }
-  return out;
-}
-async function routeOSRM(seq){
-  const coords=seq.map(p=>`${p.lon},${p.lat}`).join(';');
-  const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`);
-  if(!r.ok)throw new Error('Routing nicht erreichbar');
-  const j=await r.json(); if(!j.routes?.length)throw new Error('Keine Route gefunden'); return j.routes[0];
-}
-async function generate(){
-  const start=points.find(p=>p.id===document.getElementById('startSelect').value),n=+document.getElementById('count').value,focus=document.getElementById('focus').value,target=+document.getElementById('duration').value;
-  if(!start)return;
-  document.getElementById('routeStatus').textContent='Route wird berechnet …';
-  let best=null;
-  for(let tries=0;tries<5;tries++){
-    const seq=[start,...weightedPick(points,n,focus,start),start];
-    try{const r=await routeOSRM(seq),score=Math.abs(r.duration/60-target);if(!best||score<best.score)best={seq,r,score};}catch(e){}
-  }
-  if(!best){document.getElementById('routeStatus').textContent='Routingdienst aktuell nicht erreichbar.';return;}
-  currentRoute=best.seq;
-  if(routeLine)map.removeLayer(routeLine);
-  routeLine=L.geoJSON(best.r.geometry,{style:{weight:6,opacity:.8}}).addTo(map);
-  map.fitBounds(routeLine.getBounds(),{padding:[25,25]});
-  document.getElementById('routeList').innerHTML=currentRoute.map((p,i)=>`<li><b>${i===0?'Start':i===currentRoute.length-1?'Ende':p.name}</b>${i>0&&i<currentRoute.length-1?`<div class="task">${p.task}</div>`:''}</li>`).join('');
-  document.getElementById('routeStatus').innerHTML=`<b>${(best.r.distance/1000).toFixed(1)} km</b> · ca. <b>${Math.round(best.r.duration/60)} min</b> reine Fahrzeit<br><span class="muted">Mit Aufgaben/Anhalten real etwas länger.</span>`;
-}
-function navigate(){
-  if(!currentRoute.length)return alert('Bitte zuerst eine Route erzeugen.');
-  const pts=currentRoute,origin=`${pts[0].lat},${pts[0].lon}`,dest=`${pts.at(-1).lat},${pts.at(-1).lon}`,wps=pts.slice(1,-1).map(p=>`${p.lat},${p.lon}`).join('|');
-  window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&travelmode=driving&waypoints=${encodeURIComponent(wps)}`,'_blank');
-}
-document.getElementById('generate').onclick=generate;
-document.getElementById('navigate').onclick=navigate;
-document.getElementById('reloadBtn').onclick=loadCloud;
-document.getElementById('exportBtn').onclick=()=>{
-  const blob=new Blob([JSON.stringify(points,null,2)],{type:'application/json'}),a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download='pruefungsrouten_hattingen_gps.json';a.click();URL.revokeObjectURL(a.href);
-};
-populate();redrawMarkers();loadCloud();
-</script>
-</body>
-</html>
+<section class="card"><h2>Eigenen Punkt hinzufügen</h2><p class="muted">Name eingeben, Typ wählen, dann Position auf der Karte antippen. Speicherung erfolgt zentral in Supabase.</p><label>Name</label><input id="newPointName" list="pointNames" placeholder="z. B. Fahrschule Linden"><datalist id="pointNames"><option value="Platz"><option value="Fahrschule Linden"><option value="Fahrschule Hattingen Südstadt"><option value="Fahrschule Welper"><option value="Fahrschule Sprockhövel"></datalist><label>Typ</label><select id="newPointType"><option value="start" selected>Startpunkt</option><option value="mixed">Normaler Prüfpunkt</option><option value="residential">Wohngebiet / VB</option><option value="priority">Vorfahrt / Stop / Einbahnstraße</option><option value="basic">Grundfahraufgabe</option><option value="long">Längere Verbindung</option></select><label>Hinweis / Aufgabe</label><input id="newPointTask" placeholder="optional"><button class="primary" id="addPointBtn">Punkt auf Karte setzen</button></section>
+<section class="card"><details open><summary><b>GPS-Punkte verwalten</b></summary><p class="muted">„Auf Karte setzen“ drücken und dann die echte Stelle antippen.</p><div id="points"></div><button class="ghost" id="reloadBtn">Aus Supabase neu laden</button><div style="height:6px"></div><button class="ghost" id="exportBtn">GPS-Daten exportieren</button></details></section>
+<section class="card tiny">VB = verkehrsberuhigter Bereich. Beschilderung und tatsächliche Verkehrslage vor Ort haben Vorrang.</section></aside><div id="mapWrap"><div id="map"></div><button id="mapToggle" class="map-toggle">Karte vergrößern</button></div></main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
+const U='https://jkeecmedgsqymiskwtcl.supabase.co',K='sb_publishable_IIvi7wMB2GWkKWt1KLLHKA_6TLz9pi8',H={'apikey':K,'Authorization':'Bearer '+K,'Content-Type':'application/json'};let points=JSON.parse(localStorage.getItem('hattingen_exam_points')||'[]'),settingId=null,pending=null,markers={},routeLine=null,currentRoute=[];const map=L.map('map').setView([51.399,7.185],13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+function sync(ok,t){let b=document.getElementById('syncBadge');b.textContent=t;b.className='sync '+(ok?'ok':'warn')}
+async function load(){try{let r=await fetch(U+'/rest/v1/exam_points?select=*&order=name.asc',{headers:H});if(!r.ok)throw Error(await r.text());let d=await r.json();points=d.map(p=>({...p,lat:+p.lat,lon:+p.lon}));localStorage.setItem('hattingen_exam_points',JSON.stringify(points));sync(true,'Supabase synchronisiert');populate();draw();status(points.length+' GPS-Punkte aus Supabase geladen.')}catch(e){sync(false,'lokaler Fallback');populate();draw();status('Supabase nicht erreichbar. Lokale Daten werden verwendet.')}}
+async function save(p){localStorage.setItem('hattingen_exam_points',JSON.stringify(points));try{let r=await fetch(U+'/rest/v1/exam_points?on_conflict=id',{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(p)});if(!r.ok)throw Error(await r.text());sync(true,'Supabase synchronisiert');return true}catch(e){sync(false,'lokal gespeichert');return false}}
+function status(t){document.getElementById('routeStatus').textContent=t}function icon(p){return L.divIcon({className:'',html:`<div style="width:15px;height:15px;border-radius:50%;background:${p.amb?'#f59e0b':p.verified?'#22c55e':'#38bdf8'};border:2px solid white"></div>`,iconSize:[15,15],iconAnchor:[7,7]})}
+function draw(){Object.values(markers).forEach(m=>map.removeLayer(m));markers={};points.forEach(p=>markers[p.id]=L.marker([p.lat,p.lon],{icon:icon(p)}).addTo(map).bindPopup(`<b>${p.name}</b><br>${p.task||''}`))}
+function populate(){let s=document.getElementById('startSelect'),old=s.value,starts=points.filter(p=>p.cat==='start');s.innerHTML=starts.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');s.value=starts.some(p=>p.id===old)?old:(starts.find(p=>p.id==='tuev')?.id||starts[0]?.id||'');document.getElementById('points').innerHTML=points.map(p=>`<div class="point-row"><b>${p.name} ${p.amb?'<span class="pill warn">prüfen</span>':'<span class="pill ok">gesetzt</span>'}</b><div class="coords">${(+p.lat).toFixed(6)}, ${(+p.lon).toFixed(6)}</div><div class="tiny">${p.task||''}</div><button class="ghost" onclick="setPoint('${p.id}')">Auf Karte setzen</button></div>`).join('')}
+window.setPoint=id=>{settingId=id;pending=null;let p=points.find(x=>x.id===id);status('Karte antippen: GPS-Punkt für „'+p.name+'“ setzen.');map.setView([p.lat,p.lon],16);openMap()};
+map.on('click',async e=>{if(pending){let p={...pending,lat:e.latlng.lat,lon:e.latlng.lng,verified:true,amb:false};pending=null;points.push(p);populate();draw();let ok=await save(p);status((ok?'Neuer Punkt zentral gespeichert: ':'Punkt lokal gespeichert: ')+p.name);closeMap();return}if(!settingId)return;let p=points.find(x=>x.id===settingId);p.lat=e.latlng.lat;p.lon=e.latlng.lng;p.amb=false;p.verified=true;settingId=null;populate();draw();let ok=await save(p);status((ok?'GPS zentral gespeichert: ':'GPS lokal gespeichert: ')+p.name);closeMap()});
+function dist(a,b){let R=6371,r=x=>x*Math.PI/180,d1=r(b.lat-a.lat),d2=r(b.lon-a.lon),q=Math.sin(d1/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(d2/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
+function pick(arr,n,f,start){let pool=arr.filter(p=>p.id!==start.id&&p.cat!=='start').map(p=>({...p,w:(f==='mixed'?1:(p.cat===f?4:.7))*(p.amb?.7:1)})),out=[],cur=start;while(out.length<n&&pool.length){pool.sort((a,b)=>(Math.random()*b.w+Math.min(dist(cur,b),6)*.05)-(Math.random()*a.w+Math.min(dist(cur,a),6)*.05));let p=pool.shift();out.push(p);cur=p}return out}
+async function osrm(seq){let c=seq.map(p=>p.lon+','+p.lat).join(';'),r=await fetch('https://router.project-osrm.org/route/v1/driving/'+c+'?overview=full&geometries=geojson');if(!r.ok)throw Error();let j=await r.json();if(!j.routes?.length)throw Error();return j.routes[0]}
+async function generate(){let start=points.find(p=>p.id===document.getElementById('startSelect').value);if(!start)return status('Bitte zuerst einen Startpunkt anlegen.');let n=+document.getElementById('count').value,f=document.getElementById('focus').value,target=+document.getElementById('duration').value,best=null;status('Route wird berechnet …');for(let i=0;i<5;i++){let seq=[start,...pick(points,n,f,start),start];try{let r=await osrm(seq),score=Math.abs(r.duration/60-target);if(!best||score<best.score)best={seq,r,score}}catch(e){}}if(!best)return status('Routingdienst aktuell nicht erreichbar.');currentRoute=best.seq;if(routeLine)map.removeLayer(routeLine);routeLine=L.geoJSON(best.r.geometry,{style:{weight:6,opacity:.8}}).addTo(map);map.fitBounds(routeLine.getBounds(),{padding:[25,25]});document.getElementById('routeList').innerHTML=currentRoute.map((p,i)=>`<li><b>${i===0?'Start':i===currentRoute.length-1?'Ende':p.name}</b>${i>0&&i<currentRoute.length-1?`<div class="task">${p.task||''}</div>`:''}</li>`).join('');document.getElementById('routeStatus').innerHTML=`<b>${(best.r.distance/1000).toFixed(1)} km</b> · ca. <b>${Math.round(best.r.duration/60)} min</b> reine Fahrzeit`}
+function navigate(){if(!currentRoute.length)return alert('Bitte zuerst eine Route erzeugen.');let p=currentRoute,o=`${p[0].lat},${p[0].lon}`,d=`${p.at(-1).lat},${p.at(-1).lon}`,w=p.slice(1,-1).map(x=>`${x.lat},${x.lon}`).join('|');window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(o)}&destination=${encodeURIComponent(d)}&travelmode=driving&waypoints=${encodeURIComponent(w)}`,'_blank')}
+function openMap(){if(innerWidth<=820){document.body.classList.add('map-full');let b=document.getElementById('mapToggle');b.textContent='Menü anzeigen';b.classList.add('menu');setTimeout(()=>map.invalidateSize(),100)}}function closeMap(){document.body.classList.remove('map-full');let b=document.getElementById('mapToggle');b.textContent='Karte vergrößern';b.classList.remove('menu');setTimeout(()=>map.invalidateSize(),100)}
+document.getElementById('addPointBtn').onclick=()=>{let name=document.getElementById('newPointName').value.trim();if(!name)return alert('Bitte Namen eingeben.');let cat=document.getElementById('newPointType').value,task=document.getElementById('newPointTask').value.trim()||(cat==='start'?'Startpunkt':'Eigener Prüfpunkt');pending={id:'custom_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),name,query:'',cat,task,verified:true,amb:false};settingId=null;status('Karte antippen: Position für „'+name+'“ setzen.');openMap()};document.getElementById('mapToggle').onclick=()=>document.body.classList.contains('map-full')?closeMap():openMap();document.getElementById('generate').onclick=generate;document.getElementById('navigate').onclick=navigate;document.getElementById('reloadBtn').onclick=load;document.getElementById('exportBtn').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(points,null,2)],{type:'application/json'}));a.download='pruefungsrouten_hattingen_gps.json';a.click()};populate();draw();load();
+</script></body></html>
